@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HPS Financial Dashboard — Hebert Professional Services</title>
+  <meta name="description" content="A small business financial dashboard by Hebert Professional Services. Revenue, expenses, profit, P&L, and CSV upload — all in a single HTML file." />
+  <meta name="author" content="Garret Hebert — Hebert Professional Services" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --navy: #1a2b52;
+      --navy-light: #243566;
+      --blue: #2b5bb8;
+      --blue-accent: #3a72e8;
+      --silver: #8a95a8;
+      --silver-light: #c8d0db;
+      --white: #ffffff;
+      --off-white: #f4f6fa;
+      --bg: #0f1829;
+      --bg-card: #162038;
+      --bg-card2: #1c2a47;
+      --green: #2ecc8f;
+      --red: #e85c5c;
+      --yellow: #f0b429;
+      --text-muted: #7a8aaa;
+      --border: rgba(255,255,255,0.07);
+      --glow: rgba(58, 114, 232, 0.15);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--white);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Background texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(43,91,184,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(26,43,82,0.3) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* HEADER */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15,24,41,0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+
+    .logo-area { display: flex; align-items: center; gap: 1rem; }
+
+    .logo-badge {
+      background: linear-gradient(135deg, var(--navy-light), var(--blue));
+      border-radius: 10px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Playfair Display', serif;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: white;
+      box-shadow: 0 4px 16px rgba(43,91,184,0.4);
+    }
+
+    .logo-text { display: flex; flex-direction: column; }
+
+    .logo-text strong {
+      font-family: 'Playfair Display', serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: 0.3px;
+    }
+
+    .logo-text span {
+      font-size: 10px;
+      color: var(--silver);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .header-right { display: flex; align-items: center; gap: 1.5rem; }
+
+    .view-toggle {
+      display: flex;
+      background: var(--bg-card);
+      border-radius: 8px;
+      padding: 3px;
+      border: 1px solid var(--border);
+      gap: 2px;
+    }
+
+    .view-toggle button {
+      background: none;
+      border: none;
+      padding: 5px 14px;
+      border-radius: 6px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .view-toggle button.active { background: var(--blue); color: white; }
+
+    .upload-btn {
+      background: transparent;
+      border: 1px solid var(--blue);
+      color: var(--blue-accent);
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .upload-btn:hover { background: var(--blue); color: white; }
+
+    .reset-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .reset-btn:hover { border-color: var(--silver); color: var(--white); }
+    .reset-btn.hidden { display: none; }
+
+    #csv-input { display: none; }
+
+    /* LAYOUT */
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: calc(100vh - 64px);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* SIDEBAR */
+    aside {
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .aside-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 0.5rem 0.75rem 0.25rem;
+      margin-top: 0.5rem;
+    }
+
+    .aside-label:first-child { margin-top: 0; }
+
+    nav a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    nav a:hover { background: var(--bg-card2); color: var(--white); }
+    nav a.active { background: rgba(43,91,184,0.2); color: var(--blue-accent); }
+
+    nav a .icon {
+      width: 18px;
+      text-align: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .contact-card {
+      background: rgba(43,91,184,0.1);
+      border: 1px solid rgba(43,91,184,0.25);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .contact-card p {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .contact-card strong {
+      display: block;
+      font-size: 12px;
+      color: var(--white);
+      margin-bottom: 4px;
+    }
+
+    .contact-card a { color: var(--text-muted); text-decoration: none; }
+    .contact-card a:hover { color: var(--blue-accent); }
+
+    /* MAIN */
+    main {
+      padding: 2rem;
+      overflow-y: auto;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      gap: 1rem;
+    }
+
+    .page-title h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--white);
+      line-height: 1.2;
+    }
+
+    .page-title p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .month-filter {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .month-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.2s;
+    }
+
+    .month-btn:hover { border-color: var(--blue); color: var(--white); }
+    .month-btn.active { background: var(--blue); border-color: var(--blue); color: white; }
+
+    /* KPI CARDS */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+
+    .kpi-card.revenue::before { background: linear-gradient(90deg, var(--blue), var(--blue-accent)); }
+    .kpi-card.expenses::before { background: linear-gradient(90deg, var(--red), #ff8a8a); }
+    .kpi-card.profit::before { background: linear-gradient(90deg, var(--green), #7fffd4); }
+    .kpi-card.margin::before { background: linear-gradient(90deg, var(--yellow), #ffe080); }
+
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .kpi-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 26px;
+      font-weight: 500;
+      color: var(--white);
+      line-height: 1;
+    }
+
+    .kpi-delta {
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .kpi-delta.up { color: var(--green); }
+    .kpi-delta.down { color: var(--red); }
+    .kpi-delta.neutral { color: var(--text-muted); }
+
+    /* CHARTS ROW */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .card-badge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: rgba(43,91,184,0.2);
+      color: var(--blue-accent);
+      border: 1px solid rgba(43,91,184,0.3);
+    }
+
+    .chart-container { position: relative; }
+
+    /* P&L TABLE */
+    .pl-section { margin-bottom: 1.5rem; }
+
+    .pl-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .pl-table th {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pl-table th:not(:first-child) { text-align: right; }
+
+    .pl-table td {
+      padding: 10px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .pl-table td:first-child {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      color: var(--silver-light);
+    }
+
+    .pl-table td:not(:first-child) { text-align: right; }
+
+    .pl-table tr.section-header td {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding-top: 16px;
+      border-bottom: none;
+    }
+
+    .pl-table tr.total-row td {
+      font-weight: 700;
+      color: var(--white);
+      border-top: 1px solid var(--border);
+      border-bottom: none;
+      padding-top: 12px;
+    }
+
+    .pl-table tr.net-row td {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--green);
+      border-top: 2px solid var(--green);
+      border-bottom: none;
+      padding-top: 14px;
+    }
+
+    .pl-table tr.net-row.loss td { color: var(--red); border-top-color: var(--red); }
+
+    .positive { color: var(--green) !important; }
+    .negative { color: var(--red) !important; }
+
+    /* BOTTOM ROW */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* INSIGHTS */
+    .insight-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .insight-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px;
+      background: var(--bg-card2);
+      border-radius: 10px;
+      border-left: 3px solid var(--blue);
+    }
+
+    .insight-item.warn { border-left-color: var(--yellow); }
+    .insight-item.good { border-left-color: var(--green); }
+
+    .insight-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+    .insight-text p {
+      font-size: 12px;
+      color: var(--silver-light);
+      line-height: 1.5;
+    }
+
+    .insight-text strong {
+      display: block;
+      font-size: 13px;
+      color: var(--white);
+      margin-bottom: 2px;
+    }
+
+    /* SIMPLE VIEW */
+    #simple-view { display: none; }
+
+    .simple-hero {
+      text-align: center;
+      padding: 3rem 1rem 2rem;
+    }
+
+    .simple-hero h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 36px;
+      font-weight: 900;
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .simple-hero p {
+      font-size: 15px;
+      color: var(--text-muted);
+    }
+
+    .simple-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .simple-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+    }
+
+    .simple-card .big-label {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .simple-card .big-number {
+      font-family: 'DM Mono', monospace;
+      font-size: 40px;
+      font-weight: 500;
+      line-height: 1;
+      margin-bottom: 0.75rem;
+    }
+
+    .simple-card .big-number.revenue-num { color: var(--blue-accent); }
+    .simple-card .big-number.expenses-num { color: var(--red); }
+    .simple-card .big-number.profit-num { color: var(--green); }
+
+    .simple-card .trend {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .simple-bottom-line {
+      background: linear-gradient(135deg, rgba(43,91,184,0.15), rgba(46,204,143,0.1));
+      border: 1px solid rgba(46,204,143,0.2);
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      margin-top: 1rem;
+    }
+
+    .simple-bottom-line p { font-size: 13px; color: var(--text-muted); margin-bottom: 0.5rem; }
+    .simple-bottom-line h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      color: var(--white);
+    }
+
+    /* UPLOAD AREA */
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 2rem;
+      text-align: center;
+      transition: all 0.2s;
+      cursor: pointer;
+      margin-bottom: 1.5rem;
+    }
+
+    .upload-area:hover, .upload-area.drag-over {
+      border-color: var(--blue);
+      background: rgba(43,91,184,0.05);
+    }
+
+    .upload-area p { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+    .upload-area strong { font-size: 14px; color: var(--white); }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-card2);
+      color: var(--white);
+      padding: 12px 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.error { border-color: var(--red); color: var(--red); }
+    .toast.success { border-color: var(--green); color: var(--green); }
+
+    /* FOOTER */
+    .dashboard-footer {
+      border-top: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      position: relative;
+      z-index: 1;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .dashboard-footer a { color: var(--blue-accent); text-decoration: none; }
+
+    /* ANIMATIONS */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .kpi-card:nth-child(1) { animation-delay: 0.05s; }
+    .kpi-card:nth-child(2) { animation-delay: 0.10s; }
+    .kpi-card:nth-child(3) { animation-delay: 0.15s; }
+    .kpi-card:nth-child(4) { animation-delay: 0.20s; }
+
+    /* RESPONSIVE */
+    @media (max-width: 1100px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .charts-row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      aside { display: none; }
+      .bottom-row { grid-template-columns: 1fr; }
+      .simple-cards { grid-template-columns: 1fr; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      main { padding: 1rem; }
+      header { padding: 0 1rem; }
+      .header-right { gap: 0.5rem; }
+    }
+
+    @media (max-width: 480px) {
+      .kpi-grid { grid-template-columns: 1fr; }
+      .logo-text { display: none; }
+      .upload-btn { padding: 7px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo-area">
+    <div class="logo-badge">HPS</div>
+    <div class="logo-text">
+      <strong>Hebert Professional Services</strong>
+      <span>Financial Dashboard</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="view-toggle">
+      <button class="active" onclick="setView('detailed')">Detailed</button>
+      <button onclick="setView('simple')">Simple</button>
+    </div>
+    <button id="reset-btn" class="reset-btn hidden" onclick="resetToSample()">↺ Sample Data</button>
+    <button class="upload-btn" onclick="document.getElementById('csv-input').click()">
+      ⬆ Upload CSV
+    </button>
+    <input type="file" id="csv-input" accept=".csv" />
+  </div>
+</header>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside>
+    <div class="aside-label">Navigation</div>
+    <nav>
+      <a class="active"><span class="icon">📊</span> Dashboard</a>
+      <a><span class="icon">📋</span> P&amp;L Report</a>
+      <a><span class="icon">📅</span> Monthly View</a>
+      <a><span class="icon">⚙️</span> Automation</a>
+    </nav>
+
+    <div class="aside-label">Filter by Month</div>
+    <nav id="month-nav"></nav>
+
+    <div class="sidebar-footer">
+      <div class="contact-card">
+        <strong>Garret Hebert</strong>
+        <p>
+          <a href="mailto:hebertprofessionalservices@gmail.com">hebertprofessionalservices@gmail.com</a><br>
+          (601) 991-5132
+        </p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main>
+
+    <!-- DETAILED VIEW -->
+    <div id="detailed-view">
+
+      <div class="page-header">
+        <div class="page-title">
+          <h1>Financial Overview</h1>
+          <p id="date-range-label">Showing all months · Sample Data</p>
+        </div>
+        <div class="month-filter" id="month-filter-btns"></div>
+      </div>
+
+      <!-- KPI CARDS -->
+      <div class="kpi-grid">
+        <div class="kpi-card revenue">
+          <div class="kpi-label">Total Revenue</div>
+          <div class="kpi-value" id="kpi-revenue">—</div>
+          <div class="kpi-delta" id="kpi-revenue-delta"></div>
+        </div>
+        <div class="kpi-card expenses">
+          <div class="kpi-label">Total Expenses</div>
+          <div class="kpi-value" id="kpi-expenses">—</div>
+          <div class="kpi-delta" id="kpi-expenses-delta"></div>
+        </div>
+        <div class="kpi-card profit">
+          <div class="kpi-label">Net Profit</div>
+          <div class="kpi-value" id="kpi-profit">—</div>
+          <div class="kpi-delta" id="kpi-profit-delta"></div>
+        </div>
+        <div class="kpi-card margin">
+          <div class="kpi-label">Profit Margin</div>
+          <div class="kpi-value" id="kpi-margin">—</div>
+          <div class="kpi-delta neutral" id="kpi-margin-label">of revenue</div>
+        </div>
+      </div>
+
+      <!-- CHARTS -->
+      <div class="charts-row">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Revenue vs. Expenses</span>
+            <span class="card-badge" id="chart-badge">Monthly</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="bar-chart" height="220"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Expense Breakdown</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="donut-chart" height="220"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- P&L TABLE -->
+      <div class="pl-section card">
+        <div class="card-header">
+          <span class="card-title">Profit &amp; Loss Statement</span>
+          <span class="card-badge" id="pl-badge">All Months</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="pl-table" id="pl-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="pl-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- BOTTOM ROW -->
+      <div class="bottom-row">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Profit Trend</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="line-chart" height="180"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Key Insights</span>
+          </div>
+          <div class="insight-list" id="insight-list"></div>
+        </div>
+      </div>
+
+      <!-- CSV UPLOAD AREA -->
+      <div class="upload-area" id="drop-zone">
+        <div style="font-size:28px">📁</div>
+        <strong>Upload Your Own CSV Data</strong>
+        <p>Drag &amp; drop or click to upload. Expects columns: <strong style="font-weight:600">Month, Revenue, Expenses</strong> (and optional category columns)</p>
+        <p style="margin-top:6px; font-size:12px;">
+          <a href="sample_data.csv" download style="color:var(--blue-accent); text-decoration:none;">↓ Download sample CSV</a>
+        </p>
+      </div>
+
+    </div><!-- /detailed-view -->
+
+    <!-- SIMPLE VIEW -->
+    <div id="simple-view">
+      <div class="simple-hero">
+        <h2>Here's Where You Stand</h2>
+        <p id="simple-period-label">All months · Sample data</p>
+      </div>
+
+      <div class="simple-cards">
+        <div class="simple-card">
+          <div class="big-label">Money In</div>
+          <div class="big-number revenue-num" id="simple-revenue">—</div>
+          <div class="trend" id="simple-revenue-trend"></div>
+        </div>
+        <div class="simple-card">
+          <div class="big-label">Money Out</div>
+          <div class="big-number expenses-num" id="simple-expenses">—</div>
+          <div class="trend" id="simple-expenses-trend"></div>
+        </div>
+        <div class="simple-card">
+          <div class="big-label">What You Kept</div>
+          <div class="big-number profit-num" id="simple-profit">—</div>
+          <div class="trend" id="simple-margin-trend"></div>
+        </div>
+      </div>
+
+      <div class="simple-bottom-line">
+        <p>Bottom line</p>
+        <h3 id="simple-verdict">—</h3>
+      </div>
+
+      <div style="text-align:center; margin-top:2rem;">
+        <div class="chart-container" style="max-width:600px; margin:0 auto;">
+          <canvas id="simple-bar" height="200"></canvas>
+        </div>
+      </div>
+    </div><!-- /simple-view -->
+
+  </main>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<!-- FOOTER -->
+<div class="dashboard-footer">
+  <span>Hebert Professional Services &nbsp;·&nbsp; Simple Financial Systems · Clear Reporting · Time-Saving Automation</span>
+  <span><a href="mailto:hebertprofessionalservices@gmail.com">hebertprofessionalservices@gmail.com</a> &nbsp;·&nbsp; (601) 991-5132</span>
+</div>
+
+<script>
+'use strict';
+
+// SAMPLE DATA
+const SAMPLE = [
+  { month: 'Jan', revenue: 18500, expenses: 11200,
+    categories: { 'Software': 1800, 'Payroll': 5000, 'Marketing': 2100, 'Office': 1200, 'Misc': 1100 } },
+  { month: 'Feb', revenue: 21000, expenses: 12400,
+    categories: { 'Software': 1800, 'Payroll': 5500, 'Marketing': 2400, 'Office': 1400, 'Misc': 1300 } },
+  { month: 'Mar', revenue: 24500, expenses: 13100,
+    categories: { 'Software': 1800, 'Payroll': 6000, 'Marketing': 2600, 'Office': 1500, 'Misc': 1200 } },
+  { month: 'Apr', revenue: 22000, expenses: 12800,
+    categories: { 'Software': 1800, 'Payroll': 5800, 'Marketing': 2500, 'Office': 1400, 'Misc': 1300 } },
+  { month: 'May', revenue: 26800, expenses: 14200,
+    categories: { 'Software': 2000, 'Payroll': 6500, 'Marketing': 2800, 'Office': 1500, 'Misc': 1400 } },
+  { month: 'Jun', revenue: 29500, expenses: 15000,
+    categories: { 'Software': 2000, 'Payroll': 7000, 'Marketing': 3000, 'Office': 1600, 'Misc': 1400 } },
+];
+
+let allData = JSON.parse(JSON.stringify(SAMPLE));
+let isSampleData = true;
+let selectedMonth = 'All';
+let currentView = 'detailed';
+let barChartInst, donutChartInst, lineChartInst, simpleBarInst;
+
+// CHART DEFAULTS
+Chart.defaults.color = '#7a8aaa';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+const COLORS = {
+  revenue: 'rgba(58,114,232,0.85)',
+  expenses: 'rgba(232,92,92,0.85)',
+  profit: 'rgba(46,204,143,0.85)',
+  donut: ['#3a72e8','#e85c5c','#2ecc8f','#f0b429','#9b59b6','#e67e22','#1abc9c','#34495e'],
+};
+
+// UTILS
+const fmt = n => {
+  const sign = n < 0 ? '-' : '';
+  return sign + '$' + Math.abs(Math.round(n)).toLocaleString('en-US');
+};
+
+function getFiltered() {
+  if (selectedMonth === 'All') return allData;
+  return allData.filter(d => d.month === selectedMonth);
+}
+
+function sumField(rows, field) {
+  return rows.reduce((s, r) => s + (Number(r[field]) || 0), 0);
+}
+
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { el.className = 'toast'; }, 3000);
+}
+
+// INIT
+function init() {
+  // Wire up file input and drop zone
+  document.getElementById('csv-input').addEventListener('change', handleCSV);
+  const drop = document.getElementById('drop-zone');
+  drop.addEventListener('click', () => document.getElementById('csv-input').click());
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', e => {
+    if (e.target === drop) drop.classList.remove('drag-over');
+  });
+  drop.addEventListener('drop', handleDrop);
+
+  buildMonthNav();
+  buildMonthFilterBtns();
+  render();
+}
+
+function buildMonthNav() {
+  const nav = document.getElementById('month-nav');
+  nav.innerHTML = '';
+  const months = ['All', ...allData.map(d => d.month)];
+  months.forEach(m => {
+    const a = document.createElement('a');
+    a.innerHTML = `<span class="icon">${m === 'All' ? '📅' : '·'}</span> ${escapeHtml(m)}`;
+    if (m === selectedMonth) a.classList.add('active');
+    a.onclick = () => { selectedMonth = m; updateActiveNav(); render(); };
+    nav.appendChild(a);
+  });
+}
+
+function buildMonthFilterBtns() {
+  const container = document.getElementById('month-filter-btns');
+  container.innerHTML = '';
+  const months = ['All', ...allData.map(d => d.month)];
+  months.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'month-btn' + (m === selectedMonth ? ' active' : '');
+    btn.textContent = m;
+    btn.onclick = () => { selectedMonth = m; updateActiveNav(); render(); };
+    container.appendChild(btn);
+  });
+}
+
+function updateActiveNav() {
+  const months = ['All', ...allData.map(d => d.month)];
+  document.querySelectorAll('#month-nav a').forEach((a, i) => {
+    a.classList.toggle('active', months[i] === selectedMonth);
+  });
+  document.querySelectorAll('#month-filter-btns .month-btn').forEach((b, i) => {
+    b.classList.toggle('active', months[i] === selectedMonth);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
+// RENDER
+function render() {
+  const rows = getFiltered();
+  const totalRev = sumField(rows, 'revenue');
+  const totalExp = sumField(rows, 'expenses');
+  const totalProfit = totalRev - totalExp;
+  const margin = totalRev > 0 ? (totalProfit / totalRev * 100).toFixed(1) : '0.0';
+
+  // Date label
+  const dataLabel = isSampleData ? 'Sample Data' : 'Your Data';
+  const label = selectedMonth === 'All'
+    ? `Showing all ${allData.length} months · ${dataLabel}`
+    : `Showing ${selectedMonth} · ${dataLabel}`;
+  document.getElementById('date-range-label').textContent = label;
+  document.getElementById('simple-period-label').textContent = label;
+
+  // KPI cards
+  document.getElementById('kpi-revenue').textContent = fmt(totalRev);
+  document.getElementById('kpi-expenses').textContent = fmt(totalExp);
+  document.getElementById('kpi-profit').textContent = fmt(totalProfit);
+  document.getElementById('kpi-margin').textContent = margin + '%';
+
+  // Deltas (compare to previous month if viewing all months)
+  setDelta('kpi-revenue-delta', 'revenue');
+  setDelta('kpi-expenses-delta', 'expenses');
+  setDelta('kpi-profit-delta', 'profit');
+
+  // Charts
+  renderBarChart(rows);
+  renderDonutChart(rows);
+  renderLineChart();
+  if (currentView === 'simple') renderSimpleBar(rows);
+
+  // P&L
+  renderPL(rows);
+
+  // Insights
+  renderInsights(totalRev, totalExp, totalProfit, parseFloat(margin), rows);
+
+  // Simple view
+  document.getElementById('simple-revenue').textContent = fmt(totalRev);
+  document.getElementById('simple-expenses').textContent = fmt(totalExp);
+  document.getElementById('simple-profit').textContent = fmt(totalProfit);
+  document.getElementById('simple-revenue-trend').textContent = rows.length > 1 ? `Avg ${fmt(totalRev/rows.length)}/mo` : '';
+  document.getElementById('simple-expenses-trend').textContent = rows.length > 1 ? `Avg ${fmt(totalExp/rows.length)}/mo` : '';
+  document.getElementById('simple-margin-trend').textContent = margin + '% profit margin';
+  document.getElementById('simple-verdict').textContent =
+    totalProfit >= 0
+      ? `You're profitable. ${fmt(totalProfit)} kept out of ${fmt(totalRev)} earned.`
+      : `You're running at a ${fmt(Math.abs(totalProfit))} loss. Time to cut costs.`;
+
+  // Badges
+  document.getElementById('pl-badge').textContent = selectedMonth === 'All' ? 'All Months' : selectedMonth;
+  document.getElementById('chart-badge').textContent = selectedMonth === 'All' ? 'All Months' : selectedMonth;
+}
+
+function setDelta(id, field) {
+  const el = document.getElementById(id);
+  // Show delta only when viewing all months and we have at least 2 months
+  if (selectedMonth !== 'All' || allData.length < 2) {
+    el.textContent = '';
+    el.className = 'kpi-delta neutral';
+    return;
+  }
+  const last = allData[allData.length - 1];
+  const prev = allData[allData.length - 2];
+  let curr, prv;
+  if (field === 'revenue') { curr = last.revenue; prv = prev.revenue; }
+  else if (field === 'expenses') { curr = last.expenses; prv = prev.expenses; }
+  else { curr = last.revenue - last.expenses; prv = prev.revenue - prev.expenses; }
+  const diff = curr - prv;
+  const pctChange = prv !== 0 ? ((diff / Math.abs(prv)) * 100).toFixed(1) : '0.0';
+  const up = diff >= 0;
+  // For expenses, "up" is bad
+  const isGood = field === 'expenses' ? !up : up;
+  const arrow = up ? '▲' : '▼';
+  el.className = 'kpi-delta ' + (isGood ? 'up' : 'down');
+  el.textContent = `${arrow} ${Math.abs(parseFloat(pctChange))}% vs prev month`;
+}
+
+// BAR CHART
+function renderBarChart(rows) {
+  const ctx = document.getElementById('bar-chart').getContext('2d');
+  if (barChartInst) barChartInst.destroy();
+  barChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.month),
+      datasets: [
+        { label: 'Revenue', data: rows.map(r => r.revenue), backgroundColor: COLORS.revenue, borderRadius: 6, borderSkipped: false },
+        { label: 'Expenses', data: rows.map(r => r.expenses), backgroundColor: COLORS.expenses, borderRadius: 6, borderSkipped: false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 16 } },
+        tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt(c.raw) } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'k', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// DONUT CHART
+function renderDonutChart(rows) {
+  const ctx = document.getElementById('donut-chart').getContext('2d');
+  if (donutChartInst) donutChartInst.destroy();
+
+  // Aggregate categories
+  const cats = {};
+  rows.forEach(r => {
+    if (r.categories) {
+      Object.entries(r.categories).forEach(([k, v]) => {
+        if (v > 0) cats[k] = (cats[k] || 0) + v;
+      });
+    }
+  });
+
+  const labels = Object.keys(cats);
+  const data = Object.values(cats);
+
+  // Fallback when no categories
+  if (labels.length === 0) {
+    const totalExp = sumField(rows, 'expenses');
+    if (totalExp > 0) {
+      labels.push('Total Expenses');
+      data.push(totalExp);
+    }
+  }
+
+  donutChartInst = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: COLORS.donut, borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      cutout: '68%',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => ` ${c.label}: ${fmt(c.raw)}` } }
+      }
+    }
+  });
+}
+
+// LINE CHART
+function renderLineChart() {
+  const ctx = document.getElementById('line-chart').getContext('2d');
+  if (lineChartInst) lineChartInst.destroy();
+  const rows = allData;
+  lineChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: rows.map(r => r.month),
+      datasets: [{
+        label: 'Net Profit',
+        data: rows.map(r => r.revenue - r.expenses),
+        borderColor: '#2ecc8f',
+        backgroundColor: 'rgba(46,204,143,0.1)',
+        borderWidth: 2,
+        pointBackgroundColor: '#2ecc8f',
+        pointRadius: 4,
+        tension: 0.4,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' Net: ' + fmt(c.raw) } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'k', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// SIMPLE BAR
+function renderSimpleBar(rows) {
+  const canvas = document.getElementById('simple-bar');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (simpleBarInst) simpleBarInst.destroy();
+  simpleBarInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.month),
+      datasets: [
+        { label: 'Revenue', data: rows.map(r => r.revenue), backgroundColor: COLORS.revenue, borderRadius: 6 },
+        { label: 'Expenses', data: rows.map(r => r.expenses), backgroundColor: COLORS.expenses, borderRadius: 6 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12 } },
+        tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt(c.raw) } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => '$' + (v/1000) + 'k' } }
+      }
+    }
+  });
+}
+
+// P&L TABLE
+function renderPL(rows) {
+  const tbody = document.getElementById('pl-tbody');
+  const thead = document.querySelector('#pl-table thead tr');
+
+  // Rebuild header
+  thead.innerHTML = '';
+  const labelTh = document.createElement('th');
+  labelTh.textContent = 'Category';
+  thead.appendChild(labelTh);
+
+  if (rows.length > 1) {
+    rows.forEach(r => {
+      const th = document.createElement('th');
+      th.textContent = r.month;
+      thead.appendChild(th);
+    });
+  }
+  const totalTh = document.createElement('th');
+  totalTh.textContent = rows.length > 1 ? 'Total' : (selectedMonth === 'All' ? 'Total' : selectedMonth);
+  thead.appendChild(totalTh);
+
+  // Total columns count (after the first label column)
+  const dataColCount = (rows.length > 1 ? rows.length : 0) + 1;
+
+  tbody.innerHTML = '';
+
+  const totalRev = sumField(rows, 'revenue');
+  const totalExp = sumField(rows, 'expenses');
+  const totalProfit = totalRev - totalExp;
+
+  // Revenue section
+  addSectionHeader(tbody, 'Revenue', dataColCount);
+  addDataRow(tbody, 'Total Revenue', rows.map(r => r.revenue), totalRev, 'positive', rows.length > 1);
+
+  // Expenses section
+  addSectionHeader(tbody, 'Expenses', dataColCount);
+
+  // Categories — preserve insertion order from data
+  const catOrder = [];
+  const catSeen = new Set();
+  rows.forEach(r => {
+    if (r.categories) {
+      Object.keys(r.categories).forEach(k => {
+        if (!catSeen.has(k)) { catSeen.add(k); catOrder.push(k); }
+      });
+    }
+  });
+
+  catOrder.forEach(cat => {
+    const vals = rows.map(r => (r.categories && r.categories[cat]) || 0);
+    const total = vals.reduce((s, v) => s + v, 0);
+    if (total > 0) addDataRow(tbody, cat, vals, total, '', rows.length > 1);
+  });
+
+  addTotalRow(tbody, 'Total Expenses', rows.map(r => r.expenses), totalExp, 'negative', rows.length > 1);
+
+  // Net row
+  const netTr = document.createElement('tr');
+  netTr.className = 'net-row' + (totalProfit < 0 ? ' loss' : '');
+  let netCells = `<td>Net Profit / Loss</td>`;
+  if (rows.length > 1) rows.forEach(r => { netCells += `<td>${fmt(r.revenue - r.expenses)}</td>`; });
+  netCells += `<td>${fmt(totalProfit)}</td>`;
+  netTr.innerHTML = netCells;
+  tbody.appendChild(netTr);
+}
+
+function addSectionHeader(tbody, text, dataColCount) {
+  const tr = document.createElement('tr');
+  tr.className = 'section-header';
+  tr.innerHTML = `<td>${escapeHtml(text)}</td><td colspan="${dataColCount}"></td>`;
+  tbody.appendChild(tr);
+}
+
+function addDataRow(tbody, label, vals, total, cls, showMonths) {
+  const tr = document.createElement('tr');
+  let cells = `<td>${escapeHtml(label)}</td>`;
+  if (showMonths) vals.forEach(v => { cells += `<td>${fmt(v)}</td>`; });
+  cells += `<td class="${cls}">${fmt(total)}</td>`;
+  tr.innerHTML = cells;
+  tbody.appendChild(tr);
+  return tr;
+}
+
+function addTotalRow(tbody, label, vals, total, cls, showMonths) {
+  const tr = document.createElement('tr');
+  tr.className = 'total-row';
+  let cells = `<td>${escapeHtml(label)}</td>`;
+  if (showMonths) vals.forEach(v => { cells += `<td>${fmt(v)}</td>`; });
+  cells += `<td class="${cls}">${fmt(total)}</td>`;
+  tr.innerHTML = cells;
+  tbody.appendChild(tr);
+}
+
+// INSIGHTS
+function renderInsights(rev, exp, profit, margin, rows) {
+  const list = document.getElementById('insight-list');
+  list.innerHTML = '';
+
+  const insights = [];
+
+  // Margin insight
+  if (rev <= 0) {
+    insights.push({ type: 'warn', icon: '⚠️', title: 'No Revenue', body: 'No revenue recorded for this period.' });
+  } else if (margin >= 30) {
+    insights.push({ type: 'good', icon: '✅', title: 'Healthy Margin', body: `${margin}% profit margin — you're keeping ${Math.round(margin)}¢ of every dollar earned.` });
+  } else if (margin >= 15) {
+    insights.push({ type: 'info', icon: '📊', title: 'Moderate Margin', body: `${margin}% margin is solid. Target 30%+ for more financial cushion.` });
+  } else if (margin >= 0) {
+    insights.push({ type: 'warn', icon: '⚠️', title: 'Thin Margin', body: `${margin}% margin is tight. Review your largest expense categories.` });
+  } else {
+    insights.push({ type: 'warn', icon: '🚨', title: 'Negative Margin', body: `Expenses exceed revenue by ${Math.abs(margin).toFixed(1)}%.` });
+  }
+
+  // Growth insight (only meaningful when viewing multiple months)
+  if (rows.length > 1) {
+    const first = rows[0];
+    const last = rows[rows.length - 1];
+    if (first.revenue > 0) {
+      const growth = ((last.revenue - first.revenue) / first.revenue * 100).toFixed(1);
+      if (parseFloat(growth) > 0) {
+        insights.push({ type: 'good', icon: '📈', title: 'Revenue Growing', body: `Revenue grew ${growth}% from ${first.month} to ${last.month}.` });
+      } else if (parseFloat(growth) < 0) {
+        insights.push({ type: 'warn', icon: '📉', title: 'Revenue Declined', body: `Revenue dropped ${Math.abs(parseFloat(growth))}% from ${first.month} to ${last.month}.` });
+      } else {
+        insights.push({ type: 'info', icon: '➡️', title: 'Revenue Flat', body: `Revenue unchanged from ${first.month} to ${last.month}.` });
+      }
+    }
+  }
+
+  // Expense ratio
+  if (rev > 0) {
+    const expRatio = (exp / rev * 100).toFixed(1);
+    insights.push({
+      type: parseFloat(expRatio) > 70 ? 'warn' : 'info',
+      icon: '💡',
+      title: 'Expense Ratio',
+      body: `Expenses are ${expRatio}% of revenue. ${parseFloat(expRatio) > 70 ? 'Look for cuts.' : 'Well controlled.'}`
+    });
+  }
+
+  // Profit
+  insights.push({
+    type: profit > 0 ? 'good' : 'warn',
+    icon: profit > 0 ? '💰' : '🚨',
+    title: profit > 0 ? 'Profitable' : (profit === 0 ? 'Break Even' : 'Running a Loss'),
+    body: `Net ${profit >= 0 ? 'profit' : 'loss'} of ${fmt(Math.abs(profit))} for this period.`
+  });
+
+  insights.slice(0, 4).forEach(i => {
+    const div = document.createElement('div');
+    div.className = `insight-item ${i.type}`;
+    div.innerHTML = `<div class="insight-icon">${i.icon}</div><div class="insight-text"><strong>${escapeHtml(i.title)}</strong><p>${escapeHtml(i.body)}</p></div>`;
+    list.appendChild(div);
+  });
+}
+
+// VIEW TOGGLE
+function setView(v) {
+  currentView = v;
+  document.getElementById('detailed-view').style.display = v === 'detailed' ? 'block' : 'none';
+  document.getElementById('simple-view').style.display = v === 'simple' ? 'block' : 'none';
+  document.querySelectorAll('.view-toggle button').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && v === 'detailed') || (i === 1 && v === 'simple'));
+  });
+  if (v === 'simple') {
+    // Defer until DOM has switched
+    setTimeout(() => renderSimpleBar(getFiltered()), 30);
+  }
+}
+
+// CSV UPLOAD
+function handleCSV(evt) {
+  const file = evt.target.files && evt.target.files[0];
+  parseCSV(file);
+  // Reset so the same file can be re-uploaded
+  evt.target.value = '';
+}
+
+function handleDrop(evt) {
+  evt.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const file = evt.dataTransfer.files && evt.dataTransfer.files[0];
+  if (!file) return;
+  if (!/\.csv$/i.test(file.name)) {
+    showToast('Please drop a .csv file', 'error');
+    return;
+  }
+  parseCSV(file);
+}
+
+function parseCSV(file) {
+  if (!file) return;
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: h => h.trim(),
+    complete: function(res) {
+      try {
+        const rows = (res.data || []).filter(r => Object.values(r).some(v => v !== '' && v != null));
+        if (!rows.length) { showToast('CSV appears empty.', 'error'); return; }
+
+        const cols = Object.keys(rows[0]);
+        const monthCol = cols.find(c => /^month$/i.test(c)) || cols.find(c => /month/i.test(c));
+        const revCol   = cols.find(c => /^revenue$/i.test(c)) || cols.find(c => /rev/i.test(c));
+        const expCol   = cols.find(c => /^expenses?$/i.test(c)) || cols.find(c => /exp/i.test(c));
+
+        if (!monthCol || !revCol || !expCol) {
+          showToast('CSV must have Month, Revenue, and Expenses columns.', 'error');
+          return;
+        }
+
+        const catCols = cols.filter(c => c !== monthCol && c !== revCol && c !== expCol);
+        const newData = rows.map(r => {
+          const cats = {};
+          catCols.forEach(c => { cats[c] = parseNum(r[c]); });
+          return {
+            month: String(r[monthCol] || '').trim(),
+            revenue: parseNum(r[revCol]),
+            expenses: parseNum(r[expCol]),
+            categories: cats
+          };
+        }).filter(d => d.month);
+
+        if (!newData.length) { showToast('No valid rows found in CSV.', 'error'); return; }
+
+        allData = newData;
+        isSampleData = false;
+        selectedMonth = 'All';
+        document.getElementById('reset-btn').classList.remove('hidden');
+        buildMonthNav();
+        buildMonthFilterBtns();
+        render();
+        showToast(`Loaded ${newData.length} months from ${file.name}`, 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Error parsing CSV: ' + err.message, 'error');
+      }
+    },
+    error: function(err) {
+      console.error(err);
+      showToast('Failed to read CSV file.', 'error');
+    }
+  });
+}
+
+function parseNum(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  const n = parseFloat(String(v).replace(/[$,\s]/g, ''));
+  return isFinite(n) ? n : 0;
+}
+
+function resetToSample() {
+  allData = JSON.parse(JSON.stringify(SAMPLE));
+  isSampleData = true;
+  selectedMonth = 'All';
+  document.getElementById('reset-btn').classList.add('hidden');
+  buildMonthNav();
+  buildMonthFilterBtns();
+  render();
+  showToast('Sample data restored', 'success');
+}
+
+// START
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
